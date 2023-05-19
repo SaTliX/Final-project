@@ -52,13 +52,20 @@ signupForm.addEventListener('submit', (e) => {
     })
 })
 
-// Ecouteur d'événements pour la déconnexion des utilisateurs
 const logoutButton = document.querySelector('.logout')
 logoutButton.addEventListener('click', () => {
+  // Vérifier si l'utilisateur est connecté
+  if (!auth.currentUser) {
+    // Utilisateur non connecté, afficher l'alerte
+    const loginMessage = `Please login first!`
+    alert(loginMessage)
+    return; // Arrêter l'exécution de la fonction
+  }
+
   // Déconnexion de l'utilisateur actuel
   signOut(auth)
     .then(() => {
-      console.log('user signed out')
+      console.log('User signed out')
       const logoutMessage = `You have been successfully disconnected!`
       alert(logoutMessage)
     })
@@ -66,6 +73,7 @@ logoutButton.addEventListener('click', () => {
       console.log(err.message)
     })
 })
+
 
 // Ecouteur d'événements pour la connexion des utilisateurs
 const loginForm = document.querySelector('.login')
@@ -76,16 +84,22 @@ loginForm.addEventListener('submit', (e) => {
   const email = loginForm.email.value
   const password = loginForm.password.value
 
-  // Connexion de l'utilisateur avec l'adresse email et le mot de passe fournis
-  signInWithEmailAndPassword(auth, email, password)
-    .then(e => {
-      console.log('user logged in:', e.user)
-      loginForm.reset()
-      const loginMessage = `Successfully connected!`
-      alert(loginMessage)
-
-    })
-    .catch(err => {
-      console.log(err.message)
-    })
+// Connexion de l'utilisateur avec l'adresse email et le mot de passe fournis
+signInWithEmailAndPassword(auth, email, password)
+  .then(e => {
+    console.log('user logged in:', e.user)
+    loginForm.reset()
+    const loginMessage = `Successfully connected!`
+    alert(loginMessage)
+  })
+  .catch(err => {
+    console.log(err.message)
+    if (err.code === 'auth/wrong-password') {
+      const errorMessage = `Incorrect password. Please try again.`
+      alert(errorMessage)
+    } else {
+      const errorMessage = `An error occurred: ${err.message}`
+      alert(errorMessage)
+    }
+  });
 })
