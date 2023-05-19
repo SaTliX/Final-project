@@ -8,8 +8,13 @@ import {
   query,
   orderBy,
   serverTimestamp,
-  doc
+  where,
 } from 'https://www.gstatic.com/firebasejs/9.21.0/firebase-firestore.js'
+import {
+  onAuthStateChanged,
+  getAuth,
+} from 'https://www.gstatic.com/firebasejs/9.21.0/firebase-auth.js'
+
 
 // Configuration de Firebase
 const firebaseConfig = {
@@ -42,38 +47,104 @@ onSnapshot(q, (snapshot) => {
   console.log(citations)
 })
 
-// Ajout d'une citation dans la collection
-const addCitationForm = document.querySelector('#add')
-addCitationForm.addEventListener('submit', (e) => {
-  e.preventDefault()
+const auth = getAuth(); // Initialisation de l'objet auth
 
-  const areaValue = addCitationForm.area.value
-  const authorValue = addCitationForm.author.value
+// Récupération des données de la collection en temps réel pour l'utilisateur connecté
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    const userColRef = collection(db, 'citations');
+    const userQuery = query(userColRef, where('userId', '==', user.uid), orderBy('createdAt'));
+
+    onSnapshot(userQuery, (snapshot) => {
+      let citations = [];
+      snapshot.docs.forEach((doc) => {
+        citations.push({ ...doc.data(), id: doc.id });
+      });
+      displayCitations(citations);
+    });
+  } else {
+    displayCitations([]);
+  }
+});
+
+// Ajout d'une citation dans la collection pour l'utilisateur connecté
+const addCitationForm = document.querySelector('#add');
+addCitationForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+
+  const areaValue = addCitationForm.area.value;
+  const authorValue = addCitationForm.author.value;
+
+  if(!auth.currentUser) {
+    alert('You must be logged in to add a quote');
+    return;
+  }
 
   if (areaValue.split(' ').length < 2) {
-    alert('Le texte de la citation doit contenir au moins 2 mots')
-    return
+    alert('The text of the quote must contain at least 2 words');
+    return;
   }
 
   if (authorValue.length < 3) {
-    alert('Le nom de l\'auteur doit contenir au moins 3 caractères')
-    return
+    alert('The author\'s name must contain at least 3 characters');
+    return;
   }
 
-  addDoc(colRef, {
+  // Ajout de la citation avec l'ID de l'utilisateur actuel
+  addDoc(collection(db, 'citations'), {
     title: areaValue,
     author: authorValue,
-    createdAt: serverTimestamp()
+    createdAt: serverTimestamp(),
+    userId: auth.currentUser.uid, // Associer la citation à l'utilisateur actuel
   })
     .then(() => {
-      addCitationForm.reset()
-      const addingCitationMessage = `Thanks, the quote was successfully added!`
-      alert(addingCitationMessage)
+      addCitationForm.reset();
+      const addingCitationMessage = 'Thanks, the quote was successfully added!';
+      alert(addingCitationMessage);
     })
-})
+    .catch((err) => {
+      console.log(err.message);
+    });
+});
 
-// Récupération d'un document unique de la collection en temps réel
-const docRef = doc(db, 'citations', 'o3QtMBkxXkRiZtIEfuR1')
-onSnapshot(docRef, (doc) => {
-  console.log(doc.data(), doc.id)
-})
+
+// Fonction pour afficher les citations dans la page
+function displayCitations(citations) {
+  const quotesContainer = document.getElementById('user-quotes-container');
+  if (quotesContainer) {
+    if (citations.length === 0) {
+      quotesContainer.style.display = 'none'; // Masquer la section si l'utilisateur n'a pas de citations
+      return;
+    }
+
+    quotesContainer.innerHTML = '';
+
+    citations.forEach(citation => {
+      const quoteContainer = document.createElement('div');
+      quoteContainer.id = citation.id;
+      quoteContainer.className = 'bg-gray-400 rounded-lg mt-4 shadow-md p-4';
+
+      const quoteTitle = document.createElement('h2');
+      quoteTitle.textContent = 'Your quote'; // Titre ajouté
+
+      const quoteText = document.createElement('p');
+      quoteText.id = 'quote';
+      quoteText.className = 'text-lg mb-2';
+      const formattedQuote = "'" + citation.title + "'";
+      quoteText.textContent = formattedQuote;
+
+      const quoteAuthor = document.createElement('p');
+      quoteAuthor.id = 'author';
+      quoteAuthor.className = 'text-md font-bold';
+      quoteAuthor.textContent = citation.author;
+
+      quoteContainer.appendChild(quoteTitle);
+      quoteContainer.appendChild(quoteText);
+      quoteContainer.appendChild(quoteAuthor);
+
+      quotesContainer.appendChild(quoteContainer);
+    });
+
+    quotesContainer.style.display = 'block'; // Afficher la section s'il y a des citations
+  }
+}
